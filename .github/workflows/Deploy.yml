@@ -1,8 +1,8 @@
-# 用于构建和部署静态站点到 GitHub Pages 的工作流
-name: Deploy static site to Pages
+# 用于构建和部署 AutoPiano 到 GitHub Pages 的工作流
+name: Deploy to GitHub Pages
 
 on:
-  # 在针对 main 分支的 push 事件上运行
+  # 在推送到默认分支时运行
   push:
     branches: ["main"]
 
@@ -15,48 +15,46 @@ permissions:
   pages: write
   id-token: write
 
-# 只允许一个并发部署，以避免部署冲突
+# 只允许一个并发部署
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # 构建任务
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 获取你的仓库代码
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 设置 Node.js 环境，并为 yarn 配置缓存
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # 使用一个最新的 LTS Node.js 版本
-          cache: 'yarn' # 关键！为 yarn 开启依赖缓存
+          # 考虑到项目依赖非常老旧 (如 Webpack 2)，使用 Node.js 16 是一个更安全、兼容性更好的选择
+          node-version: "16"
+          cache: 'yarn'
 
-      # 3. 安装项目依赖 (使用 --frozen-lockfile 保证 CI 环境一致性)
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # 4. 执行构建命令 (这是小月的假设，请核对你的 package.json)
       - name: Build static site
+        # 这个命令现在已经在 package.json 中定义好了
         run: yarn build
+        env:
+          # 对于旧版 Vue CLI 项目，设置此环境变量是确保生产构建的最佳实践
+          NODE_ENV: production
 
-      # 5. 上传构建好的 dist 目录作为部署制品
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist # 假设输出目录是 dist，也请核对
+          path: ./dist
 
-  # 部署任务
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build # 必须等待 build 任务成功
+    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
