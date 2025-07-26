@@ -1,5 +1,5 @@
-# 用于构建和部署 AutoPiano 项目到 GitHub Pages 的工作流
-name: Deploy AutoPiano to Pages
+# 用于构建和部署静态站点到 GitHub Pages 的工作流
+name: Deploy static site to Pages
 
 on:
   # 在针对 main 分支的 push 事件上运行
@@ -29,48 +29,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 智能检测项目使用的包管理器 (npm 或 yarn)
-      - name: Detect package manager
-        id: detect-package-manager
-        run: |
-          if [ -f "${{ github.workspace }}/yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install --frozen-lockfile" >> $GITHUB_OUTPUT
-            exit 0
-          elif [ -f "${{ github.workspace }}/package.json" ]; then
-            echo "manager=npm" >> $GITHUB_OUTPUT
-            echo "command=ci" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Unable to determine package manager"
-            exit 1
-          fi
-          
-      # 3. 设置 Node.js 环境，并根据上一步的结果缓存依赖
+      # 2. 设置 Node.js 环境，并为 yarn 配置缓存
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # 使用一个稳定且兼容的 Node.js 版本
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
-      - name: Set public npm registry
-        run: npm config set registry https://registry.npmjs.org/
-      # 💡 关键！用 yarn 的命令来设置 yarn 的仓库地址
-      - name: Set public yarn registry
-        run: yarn config set registry https://registry.npmjs.org
-        
-      # 4. 安装项目依赖
+          node-version: "20" # 使用一个最新的 LTS Node.js 版本
+          cache: 'yarn' # 关键！为 yarn 开启依赖缓存
+
+      # 3. 安装项目依赖 (使用 --frozen-lockfile 保证 CI 环境一致性)
       - name: Install dependencies
-        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+        run: yarn install --frozen-lockfile
 
-      # 5. 执行构建命令
-      - name: Build project
-        run: ${{ steps.detect-package-manager.outputs.manager }} run build
+      # 4. 执行构建命令 (这是小月的假设，请核对你的 package.json)
+      - name: Build static site
+        run: yarn build
 
-      # 6. 上传构建好的 dist 目录作为部署制品
+      # 5. 上传构建好的 dist 目录作为部署制品
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./dist # 假设输出目录是 dist，也请核对
 
   # 部署任务
   deploy:
@@ -80,7 +58,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build # 必须等待 build 任务成功
     steps:
-      # 7. 从制品中拉取文件并部署到 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
